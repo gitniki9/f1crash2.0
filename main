@@ -1,1 +1,246 @@
 
+import pygame
+import time
+import random
+import os
+from pygame import mixer
+
+mixer.init()
+pygame.init()
+
+
+SCREEN_WIDTH = 600
+SCREEN_HEIGHT = 600
+screen = pygame.display.set_mode((SCREEN_WIDTH,SCREEN_HEIGHT))
+pygame.display.set_caption('F1 CRASH 2.0')
+dest = 0,0
+
+
+pygame.mixer.music.load('Sounds/music.mp3')
+pygame.mixer.music.play(-1, 0,0)
+pygame.mixer.music.set_volume(0.6)
+crash_fx = pygame.mixer.Sound('Sounds/crash.mp3')
+crash_fx.set_volume(0.3)
+gameover_fx = pygame.mixer.Sound('Sounds/gameover.mp3')
+gameover_fx.set_volume(0.1)
+
+
+FPS = 60
+clock = pygame.time.Clock()
+game_over = False
+score = 0
+high_score = 0
+WHITE = (255, 255 , 255)
+RED = (255, 0, 0)
+BLACK = (0, 0, 0 )
+font_small = pygame.font.SysFont('Rockwell', 15)
+font_big = pygame.font.SysFont('Rockwell', 25)
+fade_counter = 0
+scroll = -0
+scroll_speed = 4
+
+
+if os.path.exists('score.txt'):
+	with open('score.txt', 'r') as file:
+		high_score = int(file.read())
+else:
+	high_score = 0
+
+
+bg_img = pygame.image.load('img/bg2.png').convert_alpha()
+car_img = pygame.image.load('img/car.png').convert_alpha()
+glass_img = pygame.image.load('img/gl.png').convert_alpha()
+restart_img = pygame.image.load('img/restart.png').convert_alpha()
+exit_img = pygame.image.load('img/exit.png').convert_alpha()
+
+
+enemy_images = [
+    pygame.image.load('img/green.png'),
+    pygame.image.load('img/orange.png'),
+    pygame.image.load('img/pink.png'),
+    pygame.image.load('img/purple.png'),
+    pygame.image.load('img/grey.png'),
+    pygame.image.load('img/grey.png'),
+]
+
+enemy_img = random.choice(enemy_images)
+
+
+def draw_text(text, font, text_col, x, y):
+	img = font.render(text, True, text_col)
+	screen.blit(img, (x,y))
+
+
+class Button():
+    def __init__(self, x, y, image):
+        self.image = image
+        self.rect = self.image.get_rect()
+        self.rect.x = x
+        self.rect.y = y
+        self.clicked = False
+        self.mask = pygame.mask.from_surface(self.image)
+
+
+    def draw(self):
+        action = False
+        pos = pygame.mouse.get_pos()
+        if self.rect.collidepoint(pos):
+            if pygame.mouse.get_pressed()[0] == 1 and self.clicked == False:
+                self.clicked == True
+                action = True
+
+        if pygame.mouse.get_pressed()[0] == 0:
+            self.clicked = False
+
+
+        screen.blit(self.image, self.rect)
+
+        return action
+
+
+class Player():
+    def __init__(self, x,y):
+        self.image = car_img
+        self.width=75
+        self.height=150
+        self.rect = self.image.get_rect()
+        self.rect.center = (x, y)
+        self.flip = False
+
+    def move(self):
+        dx=0
+        dy=0
+
+
+        key = pygame.key.get_pressed()
+
+        if key[pygame.K_d]:
+            dx = 10
+            self.flip = False
+        if key[pygame.K_a]:
+            dx = -10
+            self.flip = False
+
+
+        if self.rect.left + dx < 150:
+            dx = 0
+        if self.rect.right + dx > 440:
+            dx = 0
+
+
+        self.rect.x += dx
+        self.rect.y += dy
+
+        self.mask = pygame.mask.from_surface(self.image)
+
+
+
+    def draw(self):
+        screen.blit(pygame.transform.flip(self.image, self.flip, False), (self.rect.x , self.rect.y ))
+
+
+class Enemy():
+    def __init__(self, x, y):
+        self.image = enemy_img
+        self.width = 75
+        self.height = 150
+        self.rect = self.image.get_rect()
+        self.rect.center = (x, y)
+        self.speed = 5
+        self.flip = False
+
+
+    def draw(self):
+        screen.blit(pygame.transform.flip(self.image, self.flip, False), (self.rect.x , self.rect.y ))
+        self.rect.y = self.rect.y + self.speed
+        enemy_position = self.rect.y
+        if self.rect.y > 590:
+            x = random.randint(190,400)
+            y = 0
+            self.rect.center = (x, y)
+            self.speed += 0.2
+            global score
+            global high_score
+            score += 10
+            if score > high_score:
+                high_score = score
+                with open('score.txt', 'w') as file:
+                    file.write(str(high_score))
+            self.image = random.choice(enemy_images)
+
+
+
+car = Player(300 , 500)
+enemy = Enemy(300, -20)
+enemies = [enemy]
+
+restart_button = Button(10, 450, restart_img)
+exit_button = Button(390,450, exit_img)
+
+
+run = True
+
+while run:
+
+    if game_over == False:
+
+        clock.tick(FPS)
+        car.move()
+        screen.blit(bg_img, (0,scroll))
+        draw_text('SCORE: ' + str(score), font_small, WHITE, 5, 200)
+        draw_text('HIGH SCORE: ' + str(high_score), font_small, WHITE, 5, 300)
+        scroll += scroll_speed
+        if abs(scroll) < 15:
+            scroll = -107
+
+        car.draw()
+
+        enemy.draw()
+
+        if pygame.sprite.spritecollide(car, enemies, False):
+            if pygame.sprite.spritecollide(car, enemies, False, pygame.sprite.collide_mask):
+                crash_fx.play()
+                game_over = True
+
+    else:
+
+        if fade_counter < 600:
+            fade_counter += 1
+            fade_screen = pygame.draw.rect(screen, BLACK , (0, 0, fade_counter, SCREEN_HEIGHT))
+            screen.blit(glass_img,dest)
+            gameover_fx.play(-1,0,0)
+            pygame.mixer.music.stop()
+            #pass_fx.stop()
+
+        draw_text('GAME OVER!', font_big, WHITE, 220, 100)
+        draw_text('SCORE: ' + str(score), font_big, WHITE, 240, 200)
+        draw_text('HIGH SCORE: ' + str(high_score), font_big, WHITE, 210, 300)
+
+
+        if restart_button.draw():
+            score = 0
+            game_over = False
+            enemy.rect.center = 300, -20
+            enemy.speed = 5
+            fade_counter = 0
+            gameover_fx.stop()
+            pygame.mixer.music.play(-1, 0.0)
+            # pass_fx.play(-1, 0, 0)
+
+        if exit_button.draw():
+            run = False
+
+        key = pygame.key.get_pressed()
+        if key[pygame.K_SPACE]:
+            pass
+
+    for event in pygame.event.get():
+
+
+        if event.type == pygame.QUIT:
+            run = False
+
+
+    pygame.display.update()
+
+pygame.quit()
